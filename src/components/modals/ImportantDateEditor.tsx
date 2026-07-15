@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Eraser } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -23,109 +23,108 @@ import {
 import { useStore } from '@/store/useStore';
 import { COLOR_PALETTE } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { ScheduleEntry } from '@/types';
+import type { ImportantDate } from '@/types';
 
-interface TimeBlockEditorProps {
+interface ImportantDateEditorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  weekKey: string;
-  day: string | null;
-  hour: string | null;
-  entry: ScheduleEntry | null;
+  /** Evento a editar; null para crear uno nuevo. */
+  event: ImportantDate | null;
+  /** Fecha por defecto al crear ('yyyy-MM-dd'). */
+  defaultDate?: string;
 }
 
-export function TimeBlockEditor({
+export function ImportantDateEditor({
   open,
   onOpenChange,
-  weekKey,
-  day,
-  hour,
-  entry,
-}: TimeBlockEditorProps) {
-  const setScheduleEntry = useStore((s) => s.setScheduleEntry);
-  const clearScheduleEntry = useStore((s) => s.clearScheduleEntry);
+  event,
+  defaultDate,
+}: ImportantDateEditorProps) {
+  const addImportantDate = useStore((s) => s.addImportantDate);
+  const updateImportantDate = useStore((s) => s.updateImportantDate);
+  const deleteImportantDate = useStore((s) => s.deleteImportantDate);
 
-  const [activity, setActivity] = useState('');
-  const [place, setPlace] = useState('');
+  const [date, setDate] = useState('');
+  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('gray');
+  const [category, setCategory] = useState('red');
 
   useEffect(() => {
     if (open) {
-      setActivity(entry?.activity ?? '');
-      setPlace(entry?.place ?? '');
-      setDescription(entry?.description ?? '');
-      setCategory(entry?.category ?? 'gray');
+      setDate(event?.date ?? defaultDate ?? new Date().toISOString().slice(0, 10));
+      setTitle(event?.title ?? '');
+      setDescription(event?.description ?? '');
+      setCategory(event?.category ?? 'red');
     }
-  }, [open, entry]);
+  }, [open, event, defaultDate]);
 
   const handleSave = () => {
-    if (!day || !hour) return;
-    const trimmed = activity.trim();
+    const trimmed = title.trim();
     if (!trimmed) {
-      // Sin actividad = vaciar el bloque.
-      clearScheduleEntry(weekKey, day, hour);
-      toast.success(`Bloque de ${day} ${hour} vaciado`);
-      onOpenChange(false);
+      toast.error('El título no puede estar vacío');
       return;
     }
-    setScheduleEntry(weekKey, day, hour, {
-      activity: trimmed,
-      category,
-      place: place.trim() || undefined,
-      description: description.trim() || undefined,
-    });
-    toast.success(`Bloque de ${day} ${hour} actualizado`);
+    if (!date) {
+      toast.error('Debes elegir una fecha');
+      return;
+    }
+    if (event) {
+      updateImportantDate(event.id, { date, title: trimmed, description, category });
+      toast.success('Fecha importante actualizada');
+    } else {
+      addImportantDate({ date, title: trimmed, description, category });
+      toast.success('Fecha importante creada');
+    }
     onOpenChange(false);
   };
 
-  const handleClear = () => {
-    if (!day || !hour) return;
-    clearScheduleEntry(weekKey, day, hour);
-    toast.success(`Bloque de ${day} ${hour} vaciado`);
+  const handleDelete = () => {
+    if (!event) return;
+    deleteImportantDate(event.id);
+    toast.success('Fecha importante eliminada');
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            Editar Bloque — {day} {hour}
-          </DialogTitle>
+          <DialogTitle>{event ? 'Editar Fecha Importante' : 'Nueva Fecha Importante'}</DialogTitle>
           <DialogDescription>
-            Define la actividad, el lugar, una descripción y la categoría de color.
+            {event
+              ? 'Modifica los detalles del evento.'
+              : 'Anota un evento o hito en tu calendario anual.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="block-activity">Actividad</Label>
+            <Label htmlFor="idate-date">Fecha</Label>
             <Input
-              id="block-activity"
-              value={activity}
-              onChange={(e) => setActivity(e.target.value)}
-              placeholder="p. ej. Estudio de IA — Deep Work"
+              id="idate-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="block-place">Lugar</Label>
+            <Label htmlFor="idate-title">Título</Label>
             <Input
-              id="block-place"
-              value={place}
-              onChange={(e) => setPlace(e.target.value)}
-              placeholder="p. ej. Oficina / Casa / Universidad"
+              id="idate-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="p. ej. Deadline paper Binarias"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="block-description">Descripción</Label>
+            <Label htmlFor="idate-description">Descripción</Label>
             <Textarea
-              id="block-description"
+              id="idate-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Notas, objetivo del bloque, materiales…"
+              placeholder="Detalles, contexto, qué debe estar listo…"
               rows={3}
             />
           </div>
@@ -151,14 +150,14 @@ export function TimeBlockEditor({
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">
-          {entry ? (
+          {event ? (
             <Button
               variant="ghost"
-              className="text-muted-foreground hover:text-red-400"
-              onClick={handleClear}
+              className="text-red-400 hover:text-red-300"
+              onClick={handleDelete}
             >
-              <Eraser className="size-4" />
-              Vaciar
+              <Trash2 className="size-4" />
+              Eliminar
             </Button>
           ) : (
             <span />

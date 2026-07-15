@@ -1,7 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { RoadmapPhase, Tag, Task, TimeBlock } from '@/types';
+import type {
+  ImportantDate,
+  RoadmapPhase,
+  ScheduleEntry,
+  Tag,
+  Task,
+  WeekSchedules,
+} from '@/types';
 import { DAYS, HOURS, getPaletteEntry } from '@/lib/constants';
+import { getWeekKey } from '@/lib/date';
 
 function makeTag(id: string, name: string, colorKey: string): Tag {
   const palette = getPaletteEntry(colorKey);
@@ -131,25 +139,52 @@ const sundaySchedule: Record<string, { activity: string; category: string }> = {
   '20:00': { activity: 'Planificación semanal', category: 'gray' },
 };
 
-function buildSeedTimeBlocks(): TimeBlock[] {
-  const blocks: TimeBlock[] = [];
+/** Celdas sembradas para la semana actual (solo bloques con actividad definida). */
+function buildSeedWeekCells(): Record<string, ScheduleEntry> {
+  const cells: Record<string, ScheduleEntry> = {};
   for (const day of DAYS) {
     for (const hour of HOURS) {
       let override: { activity: string; category: string } | undefined;
       if (day === 'Sábado') override = saturdaySchedule[hour];
       else if (day === 'Domingo') override = sundaySchedule[hour];
       else override = weekdaySchedule[hour];
-      blocks.push({
-        id: `tb-${day}-${hour}`,
-        day,
-        hour,
-        activity: override?.activity ?? 'Libre',
-        category: override?.category ?? 'gray',
-      });
+      if (override) {
+        cells[`${day}|${hour}`] = { activity: override.activity, category: override.category };
+      }
     }
   }
-  return blocks;
+  return cells;
 }
+
+const CURRENT_WEEK_KEY = getWeekKey(new Date());
+
+function buildSeedWeekSchedules(): WeekSchedules {
+  return { [CURRENT_WEEK_KEY]: buildSeedWeekCells() };
+}
+
+const seedImportantDates: ImportantDate[] = [
+  {
+    id: 'idate-1',
+    date: '2026-07-24',
+    title: 'Entrega de notas — cierre de época',
+    description: 'Cerrar evaluaciones del bloque Waldorf y entregar informes a coordinación.',
+    category: 'green',
+  },
+  {
+    id: 'idate-2',
+    date: '2026-08-14',
+    title: 'Deadline draft paper Binarias',
+    description: 'Primer borrador completo del paper de binarias para revisión del colaborador.',
+    category: 'purple',
+  },
+  {
+    id: 'idate-3',
+    date: '2026-09-18',
+    title: 'Fiestas Patrias',
+    description: 'Feriado — semana de descanso y recalibración.',
+    category: 'gray',
+  },
+];
 
 const seedRoadmap: RoadmapPhase[] = [
   {
@@ -223,8 +258,14 @@ const seedRoadmap: RoadmapPhase[] = [
 interface LifeOSState {
   tags: Tag[];
   tasks: Task[];
-  timeBlocks: TimeBlock[];
+  /** Lista global y ordenada de franjas horarias (aplica a todas las semanas). */
+  hours: string[];
+  /** Horarios por semana; solo se guardan las celdas editadas de cada semana. */
+  weekSchedules: WeekSchedules;
+  /** Semana visible en el Horario. Estado de sesión, no se persiste. */
+  scheduleWeekKey: string;
   roadmapPhases: RoadmapPhase[];
+  importantDates: ImportantDate[];
 
   addTag: (name: string, colorKey: string) => void;
   updateTag: (id: string, updates: { name?: string; colorKey?: string }) => void;
@@ -243,12 +284,21 @@ interface LifeOSState {
   deleteTask: (id: string) => void;
   moveTask: (taskId: string, toColumnId: string, overTaskId: string | null) => void;
 
-  updateTimeBlock: (id: string, activity: string, category: string) => void;
+  setScheduleWeekKey: (weekKey: string) => void;
+  setScheduleEntry: (weekKey: string, day: string, hour: string, entry: ScheduleEntry) => void;
+  clearScheduleEntry: (weekKey: string, day: string, hour: string) => void;
+  copyWeek: (fromWeekKey: string, toWeekKey: string) => void;
+  addHour: (hour: string) => void;
+  removeHour: (hour: string) => void;
 
   updatePhase: (
     id: string,
     updates: Partial<Omit<RoadmapPhase, 'id' | 'phaseNumber'>>
   ) => void;
+
+  addImportantDate: (data: Omit<ImportantDate, 'id'>) => void;
+  updateImportantDate: (id: string, updates: Partial<Omit<ImportantDate, 'id'>>) => void;
+  deleteImportantDate: (id: string) => void;
 }
 
 export const useStore = create<LifeOSState>()(
@@ -256,8 +306,11 @@ export const useStore = create<LifeOSState>()(
     (set) => ({
       tags: seedTags,
       tasks: seedTasks,
-      timeBlocks: buildSeedTimeBlocks(),
+      hours: [...HOURS],
+      weekSchedules: buildSeedWeekSchedules(),
+      scheduleWeekKey: CURRENT_WEEK_KEY,
       roadmapPhases: seedRoadmap,
+      importantDates: seedImportantDates,
 
       addTag: (name, colorKey) =>
         set((state) => ({
@@ -351,12 +404,40 @@ export const useStore = create<LifeOSState>()(
           return { tasks };
         }),
 
-      updateTimeBlock: (id, activity, category) =>
-        set((state) => ({
-          timeBlocks: state.timeBlocks.map((block) =>
-            block.id === id ? { ...block, activity, category } : block
-          ),
-        })),
+      setScheduleWeekKey: (weekKey) => set({ scheduleWeekKey: weekKey }),
+
+      setScheduleEntry: (weekKey, day, hour, entry) =>
+        set((state) => {
+          const week = { ...(state.weekSchedules[weekKey] ?? {}) };
+          week[`${day}|${hour}`] = entry;
+          return { weekSchedules: { ...state.weekSchedules, [weekKey]: week } };
+        }),
+
+      clearScheduleEntry: (weekKey, day, hour) =>
+        set((state) => {
+          const week = { ...(state.weekSchedules[weekKey] ?? {}) };
+          delete week[`${day}|${hour}`];
+          return { weekSchedules: { ...state.weekSchedules, [weekKey]: week } };
+        }),
+
+      copyWeek: (fromWeekKey, toWeekKey) =>
+        set((state) => {
+          const src = state.weekSchedules[fromWeekKey];
+          if (!src) return state;
+          const clone: Record<string, ScheduleEntry> = {};
+          for (const key in src) clone[key] = { ...src[key] };
+          return { weekSchedules: { ...state.weekSchedules, [toWeekKey]: clone } };
+        }),
+
+      addHour: (hour) =>
+        set((state) =>
+          state.hours.includes(hour)
+            ? state
+            : { hours: [...state.hours, hour].sort() }
+        ),
+
+      removeHour: (hour) =>
+        set((state) => ({ hours: state.hours.filter((h) => h !== hour) })),
 
       updatePhase: (id, updates) =>
         set((state) => ({
@@ -364,10 +445,58 @@ export const useStore = create<LifeOSState>()(
             phase.id === id ? { ...phase, ...updates } : phase
           ),
         })),
+
+      addImportantDate: (data) =>
+        set((state) => ({
+          importantDates: [...state.importantDates, { ...data, id: crypto.randomUUID() }],
+        })),
+
+      updateImportantDate: (id, updates) =>
+        set((state) => ({
+          importantDates: state.importantDates.map((event) =>
+            event.id === id ? { ...event, ...updates } : event
+          ),
+        })),
+
+      deleteImportantDate: (id) =>
+        set((state) => ({
+          importantDates: state.importantDates.filter((event) => event.id !== id),
+        })),
     }),
     {
       name: 'lifeos-storage',
-      version: 1,
+      version: 2,
+      // scheduleWeekKey es estado de sesión: siempre arranca en la semana actual.
+      partialize: (state) => ({
+        tags: state.tags,
+        tasks: state.tasks,
+        hours: state.hours,
+        weekSchedules: state.weekSchedules,
+        roadmapPhases: state.roadmapPhases,
+        importantDates: state.importantDates,
+      }),
+      migrate: (persisted, version) => {
+        const state = (persisted ?? {}) as Record<string, unknown>;
+        if (version < 2) {
+          // v1 guardaba un único `timeBlocks` (semana recurrente). Se migra a la
+          // semana actual del modelo por-semana y se define la lista de horas.
+          const oldBlocks = state.timeBlocks as
+            | { day: string; hour: string; activity: string; category: string }[]
+            | undefined;
+          const cells: Record<string, ScheduleEntry> = {};
+          if (Array.isArray(oldBlocks)) {
+            for (const b of oldBlocks) {
+              if (b.activity && b.activity !== 'Libre') {
+                cells[`${b.day}|${b.hour}`] = { activity: b.activity, category: b.category };
+              }
+            }
+          }
+          delete state.timeBlocks;
+          state.hours = [...HOURS];
+          state.weekSchedules = { [CURRENT_WEEK_KEY]: cells };
+        }
+        return state;
+      },
     }
   )
 );

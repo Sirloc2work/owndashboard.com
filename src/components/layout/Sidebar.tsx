@@ -1,4 +1,11 @@
-import { CalendarClock, KanbanSquare, LayoutDashboard, Map, Zap } from 'lucide-react';
+import {
+  CalendarClock,
+  CalendarDays,
+  KanbanSquare,
+  LayoutDashboard,
+  Map,
+  Zap,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ViewId } from '@/types';
 
@@ -11,6 +18,7 @@ const NAV_ITEMS: { id: ViewId; label: string; icon: typeof LayoutDashboard }[] =
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'kanban', label: 'Kanban', icon: KanbanSquare },
   { id: 'timebox', label: 'Horario', icon: CalendarClock },
+  { id: 'calendar', label: 'Calendario', icon: CalendarDays },
   { id: 'roadmap', label: 'Roadmap', icon: Map },
 ];
 
