@@ -121,7 +121,7 @@ export async function buildAdminUser(
   return mapRow(profile, authUser?.user?.last_sign_in_at ?? null);
 }
 
-/** Huella de diagnóstico: host del servidor y prefijo/largo de la service key. */
+/** Huella de diagnóstico: host, tipo de service key, largo y hash (para ver si cambió). */
 function diag(): string {
   let host = 'sin-url';
   try {
@@ -130,8 +130,17 @@ function diag(): string {
     /* ignore */
   }
   const sk = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
-  const keyInfo = sk ? `${sk.slice(0, 8)}…(${sk.length})` : 'VACÍA';
-  return `[host ${host} · service_key ${keyInfo}]`;
+  const kind = !sk
+    ? 'VACÍA'
+    : sk.startsWith('sb_secret')
+      ? 'sb_secret'
+      : sk.startsWith('eyJ')
+        ? 'legacy-JWT'
+        : 'otro';
+  let hash = 0;
+  for (let i = 0; i < sk.length; i++) hash = (hash * 31 + sk.charCodeAt(i)) >>> 0;
+  const fp = sk ? hash.toString(16) : '—';
+  return `[host ${host} · key ${kind} len ${sk.length} fp ${fp}]`;
 }
 
 /** Todos los usuarios admin-DTO (une perfiles con auth para el último acceso). */
