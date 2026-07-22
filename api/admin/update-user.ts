@@ -10,8 +10,8 @@ import {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method !== 'POST') throw new HttpError(405, 'Método no permitido.');
+    await requireAdmin(req);
     const admin = serviceClient();
-    await requireAdmin(req, admin);
 
     const { id, role, enabledViews, active, password } = (req.body ?? {}) as {
       id?: string;
