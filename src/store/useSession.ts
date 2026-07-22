@@ -91,6 +91,7 @@ export const useSession = create<SessionState>()((set, get) => {
         set({ mode: 'login' });
         return;
       }
+      let applying = false;
       supabase.auth.onAuthStateChange((event, session) => {
         // No pisar el modo invitado con eventos de auth.
         if (get().mode === 'guest') return;
@@ -105,9 +106,18 @@ export const useSession = create<SessionState>()((set, get) => {
           if (get().mode === 'authenticated' && get().session?.user.id === session.user.id) {
             return;
           }
-          void applySession(session).catch((e) => {
-            console.error('Error aplicando la sesión:', e);
-          });
+          if (applying) return;
+          applying = true;
+          // Importante: diferir las llamadas a Supabase FUERA del callback de auth.
+          // Llamar supabase.from(...) dentro del callback provoca un deadlock por el
+          // lock interno de gotrue (la sesión autentica pero nunca carga el perfil).
+          setTimeout(() => {
+            applySession(session)
+              .catch((e) => console.error('Error aplicando la sesión:', e))
+              .finally(() => {
+                applying = false;
+              });
+          }, 0);
         } else if (event === 'INITIAL_SESSION' && !session) {
           set({ mode: 'login' });
         }
