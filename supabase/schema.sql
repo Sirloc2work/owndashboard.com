@@ -47,6 +47,16 @@ drop policy if exists "own_profile_select" on public.profiles;
 create policy "own_profile_select" on public.profiles
   for select using (auth.uid() = id);
 
+-- ── Privilegios de tabla ──────────────────────────────────────────────────
+-- RLS decide QUÉ filas, pero el rol necesita el GRANT para tocar la tabla.
+-- El usuario autenticado solo lee su perfil; lee/crea/actualiza su estado.
+grant select on public.profiles to authenticated;
+grant select, insert, update on public.lifeos_state to authenticated;
+
+-- service_role (funciones /api/admin/*) gestiona ambas tablas por completo.
+grant select, insert, update, delete on public.profiles to service_role;
+grant select, insert, update, delete on public.lifeos_state to service_role;
+
 -- ── Bootstrap del primer admin ────────────────────────────────────────────
 -- 1) Crea el usuario en Authentication → Users (o con la API).
 -- 2) Inserta su perfil como admin (reemplaza el UUID y el email):
