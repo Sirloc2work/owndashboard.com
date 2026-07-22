@@ -27,8 +27,8 @@ export function AdminView() {
     setLoading(true);
     setError(null);
     try {
-      const { users } = await listUsers();
-      setUsers(users);
+      const rows = await listUsers();
+      setUsers(rows);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron cargar los usuarios.');
     } finally {
@@ -52,12 +52,17 @@ export function AdminView() {
   };
 
   const handleDelete = async (user: AdminUser) => {
-    if (!window.confirm(`¿Eliminar la cuenta de ${user.email}? Esta acción es irreversible.`)) {
+    if (
+      !window.confirm(
+        `¿Quitar el acceso de ${user.email}? Se elimina su perfil (deja de poder entrar). ` +
+          `La cuenta de Auth se borra por completo desde el panel de Supabase.`
+      )
+    ) {
       return;
     }
     try {
       await deleteUser(user.id);
-      toast.success('Usuario eliminado');
+      toast.success('Acceso eliminado');
       setUsers((prev) => prev.filter((u) => u.id !== user.id));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'No se pudo eliminar.');
@@ -104,8 +109,7 @@ export function AdminView() {
 
       {error && !loading && (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error} (las funciones <code>/api/admin/*</code> solo corren en el despliegue de Vercel,
-          no en el dev local).
+          {error}
         </p>
       )}
 

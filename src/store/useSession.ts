@@ -1,11 +1,13 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { BASE_VIEW_IDS } from '@/lib/constants';
 import { useStore, createEmptyData } from '@/store/useStore';
 import { buildDemoData } from '@/lib/demoSeed';
 import { loadUserState, startAutosave, stopAutosave } from '@/lib/syncState';
-import type { Profile, ViewId } from '@/types';
+import { mapProfileRow } from '@/lib/profile';
+import type { Profile } from '@/types';
 
 type Mode = 'loading' | 'login' | 'authenticated' | 'guest';
 
@@ -18,21 +20,6 @@ const GUEST_PROFILE: Profile = {
   active: true,
   createdAt: new Date().toISOString(),
 };
-
-function mapProfile(row: Record<string, unknown>, fallbackEmail: string): Profile {
-  const rawViews = Array.isArray(row.enabled_views) ? (row.enabled_views as unknown[]) : [];
-  const enabledViews = rawViews.filter((v): v is ViewId =>
-    BASE_VIEW_IDS.includes(v as ViewId)
-  );
-  return {
-    id: String(row.id),
-    email: typeof row.email === 'string' ? row.email : fallbackEmail,
-    role: row.role === 'admin' ? 'admin' : 'user',
-    enabledViews: enabledViews.length ? enabledViews : [...BASE_VIEW_IDS],
-    active: row.active !== false,
-    createdAt: typeof row.created_at === 'string' ? row.created_at : new Date().toISOString(),
-  };
-}
 
 interface SessionState {
   mode: Mode;
@@ -54,18 +41,12 @@ export const useSession = create<SessionState>()((set, get) => {
       .eq('id', userId)
       .maybeSingle();
     if (error) throw error;
-    // Sin fila de perfil (p. ej. admin de bootstrap): fallback usable como 'user'.
+    // Todo usuario debe tener perfil (el trigger lo crea al alta). Si falta, se
+    // deniega el acceso en vez de asumir permisos.
     if (!data) {
-      return {
-        id: userId,
-        email,
-        role: 'user',
-        enabledViews: [...BASE_VIEW_IDS],
-        active: true,
-        createdAt: new Date().toISOString(),
-      };
+      throw new Error('Tu cuenta no tiene un perfil asignado. Contacta al administrador.');
     }
-    return mapProfile(data, email);
+    return mapProfileRow(data, email);
   }
 
   async function applySession(session: Session): Promise<void> {
@@ -126,6 +107,7 @@ export const useSession = create<SessionState>()((set, get) => {
                 useStore.getState().hydrate(createEmptyData());
                 if (supabase) void supabase.auth.signOut();
                 set({ mode: 'login', session: null, profile: null });
+                toast.error(e instanceof Error ? e.message : 'No se pudo iniciar sesión.');
               })
               .finally(() => {
                 applying = false;
