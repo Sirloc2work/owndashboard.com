@@ -129,18 +129,22 @@ function diag(): string {
   } catch {
     /* ignore */
   }
+  const keyKind = (k: string) =>
+    !k
+      ? 'VACÍA'
+      : k.startsWith('sb_secret')
+        ? 'sb_secret'
+        : k.startsWith('sb_publishable')
+          ? 'sb_publishable'
+          : k.startsWith('eyJ')
+            ? 'legacy-JWT'
+            : 'otro';
   const sk = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
-  const kind = !sk
-    ? 'VACÍA'
-    : sk.startsWith('sb_secret')
-      ? 'sb_secret'
-      : sk.startsWith('eyJ')
-        ? 'legacy-JWT'
-        : 'otro';
+  const ak = process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '';
   let hash = 0;
   for (let i = 0; i < sk.length; i++) hash = (hash * 31 + sk.charCodeAt(i)) >>> 0;
   const fp = sk ? hash.toString(16) : '—';
-  return `[host ${host} · key ${kind} len ${sk.length} fp ${fp}]`;
+  return `[host ${host} · service ${keyKind(sk)} len ${sk.length} fp ${fp} · anon ${keyKind(ak)}]`;
 }
 
 /** Todos los usuarios admin-DTO (une perfiles con auth para el último acceso). */
