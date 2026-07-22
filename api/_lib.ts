@@ -36,14 +36,21 @@ export async function requireAdmin(req: VercelRequest, admin: SupabaseClient): P
   if (!token) throw new HttpError(401, 'Falta el token de autenticación.');
 
   const { data, error } = await admin.auth.getUser(token);
-  if (error || !data.user) throw new HttpError(401, 'Token inválido.');
+  if (error || !data.user) {
+    console.error('[requireAdmin] getUser falló:', error?.message, error);
+    throw new HttpError(401, `Token inválido: ${error?.message ?? 'sin usuario'}`);
+  }
 
-  const { data: profile } = await admin
+  const { data: profile, error: profErr } = await admin
     .from('profiles')
     .select('role, active')
     .eq('id', data.user.id)
     .maybeSingle();
 
+  if (profErr) {
+    console.error('[requireAdmin] error consultando profiles:', profErr.message);
+    throw new HttpError(500, `Error consultando perfil: ${profErr.message}`);
+  }
   if (!profile || profile.role !== 'admin' || profile.active === false) {
     throw new HttpError(403, 'Acceso restringido a administradores.');
   }
