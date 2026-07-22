@@ -1,0 +1,142 @@
+import { create } from 'zustand';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
+import { BASE_VIEW_IDS } from '@/lib/constants';
+import { useStore, createEmptyData } from '@/store/useStore';
+import { buildDemoData } from '@/lib/demoSeed';
+import { loadUserState, startAutosave, stopAutosave } from '@/lib/syncState';
+import type { Profile, ViewId } from '@/types';
+
+type Mode = 'loading' | 'login' | 'authenticated' | 'guest';
+
+/** Perfil sintético del invitado: ve todas las vistas, sin rol admin. */
+const GUEST_PROFILE: Profile = {
+  id: 'guest',
+  email: 'invitado',
+  role: 'user',
+  enabledViews: [...BASE_VIEW_IDS],
+  active: true,
+  createdAt: new Date().toISOString(),
+};
+
+function mapProfile(row: Record<string, unknown>, fallbackEmail: string): Profile {
+  const rawViews = Array.isArray(row.enabled_views) ? (row.enabled_views as unknown[]) : [];
+  const enabledViews = rawViews.filter((v): v is ViewId =>
+    BASE_VIEW_IDS.includes(v as ViewId)
+  );
+  return {
+    id: String(row.id),
+    email: typeof row.email === 'string' ? row.email : fallbackEmail,
+    role: row.role === 'admin' ? 'admin' : 'user',
+    enabledViews: enabledViews.length ? enabledViews : [...BASE_VIEW_IDS],
+    active: row.active !== false,
+    createdAt: typeof row.created_at === 'string' ? row.created_at : new Date().toISOString(),
+  };
+}
+
+interface SessionState {
+  mode: Mode;
+  session: Session | null;
+  profile: Profile | null;
+  /** Suscribe a los cambios de auth de Supabase. Llamar una vez al montar. */
+  init: () => void;
+  signIn: (email: string, password: string) => Promise<void>;
+  enterGuest: () => void;
+  signOut: () => Promise<void>;
+}
+
+export const useSession = create<SessionState>()((set, get) => {
+  async function loadProfile(userId: string, email: string): Promise<Profile> {
+    if (!supabase) return { ...GUEST_PROFILE, id: userId, email };
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    // Sin fila de perfil (p. ej. admin de bootstrap): fallback usable como 'user'.
+    if (!data) {
+      return {
+        id: userId,
+        email,
+        role: 'user',
+        enabledViews: [...BASE_VIEW_IDS],
+        active: true,
+        createdAt: new Date().toISOString(),
+      };
+    }
+    return mapProfile(data, email);
+  }
+
+  async function applySession(session: Session): Promise<void> {
+    const email = session.user.email ?? '';
+    const profile = await loadProfile(session.user.id, email);
+    if (!profile.active) {
+      if (supabase) await supabase.auth.signOut();
+      set({ mode: 'login', session: null, profile: null });
+      throw new Error('Esta cuenta está desactivada. Contacta al administrador.');
+    }
+    await loadUserState(session.user.id);
+    startAutosave(session.user.id);
+    set({ session, profile, mode: 'authenticated' });
+  }
+
+  return {
+    mode: 'loading',
+    session: null,
+    profile: null,
+
+    init: () => {
+      if (!supabase) {
+        set({ mode: 'login' });
+        return;
+      }
+      supabase.auth.onAuthStateChange((event, session) => {
+        // No pisar el modo invitado con eventos de auth.
+        if (get().mode === 'guest') return;
+        if (event === 'SIGNED_OUT') {
+          stopAutosave();
+          useStore.getState().hydrate(createEmptyData());
+          set({ mode: 'login', session: null, profile: null });
+          return;
+        }
+        if (session && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
+          // Ya autenticado con la misma sesión: evitar re-hidratar en refresh de token.
+          if (get().mode === 'authenticated' && get().session?.user.id === session.user.id) {
+            return;
+          }
+          void applySession(session).catch((e) => {
+            console.error('Error aplicando la sesión:', e);
+          });
+        } else if (event === 'INITIAL_SESSION' && !session) {
+          set({ mode: 'login' });
+        }
+      });
+    },
+
+    signIn: async (email, password) => {
+      if (!supabase) {
+        throw new Error('El backend no está configurado.');
+      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw new Error('Credenciales inválidas.');
+      // La hidratación ocurre en el listener onAuthStateChange (SIGNED_IN).
+    },
+
+    enterGuest: () => {
+      stopAutosave();
+      useStore.getState().hydrate(buildDemoData());
+      set({ mode: 'guest', session: null, profile: { ...GUEST_PROFILE } });
+    },
+
+    signOut: async () => {
+      stopAutosave();
+      const wasGuest = get().mode === 'guest';
+      useStore.getState().hydrate(createEmptyData());
+      if (supabase && !wasGuest) {
+        await supabase.auth.signOut();
+      }
+      set({ mode: 'login', session: null, profile: null });
+    },
+  };
+});

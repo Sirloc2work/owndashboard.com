@@ -73,3 +73,29 @@ export type ColorKey =
   | 'pink';
 
 export type ViewId = 'dashboard' | 'kanban' | 'timebox' | 'calendar' | 'roadmap';
+
+/** Id de navegación: las 5 vistas de datos + el panel de admin. */
+export type NavId = ViewId | 'admin';
+
+export type Role = 'admin' | 'user';
+
+/** Perfil de usuario (gestionado por el admin). Vive separado de los datos del usuario. */
+export interface Profile {
+  id: string;
+  email: string;
+  role: Role;
+  /** Vistas de datos a las que el usuario tiene acceso. */
+  enabledViews: ViewId[];
+  active: boolean;
+  createdAt: string;
+}
+
+/** Los 6 slices de datos que se sincronizan con la base de datos por usuario. */
+export interface LifeOSData {
+  tags: Tag[];
+  tasks: Task[];
+  hours: string[];
+  weekSchedules: WeekSchedules;
+  roadmapPhases: RoadmapPhase[];
+  importantDates: ImportantDate[];
+}

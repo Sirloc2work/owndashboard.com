@@ -1,4 +1,22 @@
-import type { ColorKey, Column } from '@/types';
+import type { ColorKey, Column, ViewId } from '@/types';
+
+/** Las 5 vistas de datos, en orden. Fuente de verdad de `enabled_views`. */
+export const BASE_VIEW_IDS: ViewId[] = [
+  'dashboard',
+  'kanban',
+  'timebox',
+  'calendar',
+  'roadmap',
+];
+
+/** Etiquetas legibles de cada vista (para el sidebar y el panel de admin). */
+export const VIEW_LABELS: Record<ViewId, string> = {
+  dashboard: 'Dashboard',
+  kanban: 'Kanban',
+  timebox: 'Horario',
+  calendar: 'Calendario',
+  roadmap: 'Roadmap',
+};
 
 export interface PaletteEntry {
   key: ColorKey;
