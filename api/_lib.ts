@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { VercelRequest } from '@vercel/node';
 
 export const BASE_VIEW_IDS = ['dashboard', 'kanban', 'timebox', 'calendar', 'roadmap'];
@@ -30,31 +30,42 @@ function getBearer(req: VercelRequest): string | null {
   return match ? match[1] : null;
 }
 
-/** Valida el JWT del llamante y confirma que es un admin activo. */
-export async function requireAdmin(req: VercelRequest, admin: SupabaseClient): Promise<User> {
+/**
+ * Valida el JWT del llamante y confirma que es un admin activo.
+ * Se valida vía PostgREST + RLS (la misma vía que usa el cliente y que SÍ acepta
+ * los JWT ES256 de las nuevas llaves de firma), en vez de auth.getUser(), que
+ * falla al no reconocer el `kid` de la firma asimétrica.
+ */
+export async function requireAdmin(req: VercelRequest): Promise<{ id: string }> {
   const token = getBearer(req);
   if (!token) throw new HttpError(401, 'Falta el token de autenticación.');
 
-  const { data, error } = await admin.auth.getUser(token);
-  if (error || !data.user) {
-    console.error('[requireAdmin] getUser falló:', error?.message, error);
-    throw new HttpError(401, `Token inválido: ${error?.message ?? 'sin usuario'}`);
+  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
+  const anon = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
+  if (!url || !anon) {
+    throw new HttpError(500, 'Faltan SUPABASE_URL o la anon key en el servidor.');
   }
 
-  const { data: profile, error: profErr } = await admin
+  // Cliente con la anon key + el token del usuario: PostgREST valida el JWT y la
+  // policy own_profile_select devuelve solo la fila del propio llamante.
+  const userClient = createClient(url, anon, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const { data: profile, error } = await userClient
     .from('profiles')
-    .select('role, active')
-    .eq('id', data.user.id)
-    .maybeSingle();
+    .select('id, role, active')
+    .single();
 
-  if (profErr) {
-    console.error('[requireAdmin] error consultando profiles:', profErr.message);
-    throw new HttpError(500, `Error consultando perfil: ${profErr.message}`);
+  if (error || !profile) {
+    console.error('[requireAdmin] validación falló:', error?.message);
+    throw new HttpError(401, `Token inválido: ${error?.message ?? 'sin perfil'}`);
   }
-  if (!profile || profile.role !== 'admin' || profile.active === false) {
+  if (profile.role !== 'admin' || profile.active === false) {
     throw new HttpError(403, 'Acceso restringido a administradores.');
   }
-  return data.user;
+  return { id: String(profile.id) };
 }
 
 export function sanitizeViews(input: unknown): string[] {

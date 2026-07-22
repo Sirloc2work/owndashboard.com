@@ -3,8 +3,8 @@ import { serviceClient, requireAdmin, fetchAllAdminUsers, HttpError } from '../_
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    await requireAdmin(req);
     const admin = serviceClient();
-    await requireAdmin(req, admin);
     const users = await fetchAllAdminUsers(admin);
     res.status(200).json({ users });
   } catch (e) {
