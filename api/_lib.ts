@@ -11,14 +11,24 @@ export class HttpError extends Error {
   }
 }
 
+/**
+ * URL base del proyecto. Se prefiere VITE_SUPABASE_URL (la del cliente) para que
+ * la validación del token vaya SIEMPRE contra el proyecto que emitió la sesión, y
+ * se limpian barras finales o un `/rest/v1` colado por error.
+ */
+function resolveUrl(): string {
+  const raw = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
+  if (!raw) throw new HttpError(500, 'Falta VITE_SUPABASE_URL / SUPABASE_URL en el servidor.');
+  return raw.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+}
+
 /** Cliente con service_role: bypassa RLS. Solo en el servidor. */
 export function serviceClient(): SupabaseClient {
-  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new HttpError(500, 'Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en el servidor.');
+  if (!key) {
+    throw new HttpError(500, 'Falta SUPABASE_SERVICE_ROLE_KEY en el servidor.');
   }
-  return createClient(url, key, {
+  return createClient(resolveUrl(), key, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
@@ -40,10 +50,10 @@ export async function requireAdmin(req: VercelRequest): Promise<{ id: string }> 
   const token = getBearer(req);
   if (!token) throw new HttpError(401, 'Falta el token de autenticación.');
 
-  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const anon = process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !anon) {
-    throw new HttpError(500, 'Faltan SUPABASE_URL o la anon key en el servidor.');
+  const url = resolveUrl();
+  const anon = process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
+  if (!anon) {
+    throw new HttpError(500, 'Falta VITE_SUPABASE_ANON_KEY en el servidor.');
   }
 
   // Cliente con la anon key + el token del usuario: PostgREST valida el JWT y la
@@ -59,8 +69,8 @@ export async function requireAdmin(req: VercelRequest): Promise<{ id: string }> 
     .single();
 
   if (error || !profile) {
-    console.error('[requireAdmin] validación falló:', error?.message);
-    throw new HttpError(401, `Token inválido: ${error?.message ?? 'sin perfil'}`);
+    console.error('[requireAdmin] validación falló:', error?.message, 'host:', new URL(url).host);
+    throw new HttpError(401, `Token inválido: ${error?.message ?? 'sin perfil'} [srv host: ${new URL(url).host}]`);
   }
   if (profile.role !== 'admin' || profile.active === false) {
     throw new HttpError(403, 'Acceso restringido a administradores.');
