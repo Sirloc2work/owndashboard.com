@@ -121,15 +121,29 @@ export async function buildAdminUser(
   return mapRow(profile, authUser?.user?.last_sign_in_at ?? null);
 }
 
+/** Huella de diagnóstico: host del servidor y prefijo/largo de la service key. */
+function diag(): string {
+  let host = 'sin-url';
+  try {
+    host = new URL(resolveUrl()).host;
+  } catch {
+    /* ignore */
+  }
+  const sk = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
+  const keyInfo = sk ? `${sk.slice(0, 8)}…(${sk.length})` : 'VACÍA';
+  return `[host ${host} · service_key ${keyInfo}]`;
+}
+
 /** Todos los usuarios admin-DTO (une perfiles con auth para el último acceso). */
 export async function fetchAllAdminUsers(admin: SupabaseClient): Promise<AdminUserDto[]> {
   const { data: profiles, error } = await admin
     .from('profiles')
     .select('*')
     .order('created_at', { ascending: true });
-  if (error) throw new HttpError(500, error.message);
+  if (error) throw new HttpError(500, `profiles: ${error.message} ${diag()}`);
 
-  const { data: authList } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  const { data: authList, error: authErr } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  if (authErr) throw new HttpError(500, `auth.listUsers: ${authErr.message} ${diag()}`);
   const lastSignInById = new Map<string, string | null>();
   for (const u of authList?.users ?? []) {
     lastSignInById.set(u.id, u.last_sign_in_at ?? null);
