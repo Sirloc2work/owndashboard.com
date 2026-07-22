@@ -70,17 +70,16 @@ export function UserFormDialog({ open, onOpenChange, user, onSaved }: UserFormDi
     setSaving(true);
     try {
       if (isEdit && user) {
-        const { user: saved } = await updateUser({
+        const saved = await updateUser({
           id: user.id,
           role,
           enabledViews,
           active,
-          password: password ? password : undefined,
         });
         toast.success('Usuario actualizado');
         onSaved(saved);
       } else {
-        const { user: saved } = await createUser({
+        const saved = await createUser({
           email: email.trim(),
           password,
           role,
@@ -104,7 +103,7 @@ export function UserFormDialog({ open, onOpenChange, user, onSaved }: UserFormDi
           <DialogTitle>{isEdit ? 'Editar usuario' : 'Nuevo usuario'}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? 'Modifica el rol, el acceso a vistas o restablece la contraseña.'
+              ? 'Modifica el rol o el acceso a vistas.'
               : 'Crea una cuenta y define su acceso a las vistas.'}
           </DialogDescription>
         </DialogHeader>
@@ -122,18 +121,22 @@ export function UserFormDialog({ open, onOpenChange, user, onSaved }: UserFormDi
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="user-password">
-              {isEdit ? 'Nueva contraseña (opcional)' : 'Contraseña'}
-            </Label>
-            <Input
-              id="user-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={isEdit ? 'Dejar en blanco para no cambiar' : '••••••••'}
-            />
-          </div>
+          {!isEdit && (
+            <div className="space-y-2">
+              <Label htmlFor="user-password">Contraseña</Label>
+              <Input
+                id="user-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+              <p className="text-xs text-muted-foreground">
+                Para que pueda entrar de inmediato, "Confirm email" debe estar desactivado en
+                Supabase (Authentication → Providers → Email).
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Rol</Label>

@@ -1,9 +1,7 @@
--- LifeOS · Esquema Supabase (multiusuario con auth y roles)
--- Ejecutar en el SQL Editor del proyecto Supabase.
+-- LifeOS · Esquema Supabase (multiusuario, auth + roles, admin vía RLS)
+-- Ejecutar en el SQL Editor. Es idempotente: puede correrse varias veces.
 
 -- ── Perfiles ──────────────────────────────────────────────────────────────
--- Rol y acceso a vistas los controla el admin. Vive separado de los datos del
--- usuario para que este no pueda auto-otorgarse vistas ni el rol admin.
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
@@ -13,9 +11,7 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
--- ── Estado de LifeOS por usuario ──────────────────────────────────────────
--- Blob JSONB con los 6 slices persistidos del store (tags, tasks, hours,
--- weekSchedules, roadmapPhases, importantDates).
+-- ── Estado de LifeOS por usuario (blob JSONB con los 6 slices del store) ─────
 create table if not exists public.lifeos_state (
   user_id uuid primary key references auth.users(id) on delete cascade,
   data jsonb not null default '{}'::jsonb,
@@ -25,8 +21,22 @@ create table if not exists public.lifeos_state (
 alter table public.profiles enable row level security;
 alter table public.lifeos_state enable row level security;
 
--- ── RLS: estado ───────────────────────────────────────────────────────────
--- Cada usuario lee/escribe SOLO su propia fila.
+-- ── ¿El usuario actual es admin? ────────────────────────────────────────────
+-- SECURITY DEFINER: corre como el dueño de la función y NO dispara las policies
+-- de profiles, evitando recursión de RLS.
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'admin' and active = true
+  );
+$$;
+
+-- ── RLS: estado (cada usuario, su propia fila) ──────────────────────────────
 drop policy if exists "own_state_select" on public.lifeos_state;
 create policy "own_state_select" on public.lifeos_state
   for select using (auth.uid() = user_id);
@@ -39,28 +49,63 @@ drop policy if exists "own_state_update" on public.lifeos_state;
 create policy "own_state_update" on public.lifeos_state
   for update using (auth.uid() = user_id);
 
--- ── RLS: perfil ───────────────────────────────────────────────────────────
--- Un usuario lee su propio perfil; NO puede modificar su rol ni enabled_views.
--- La gestión de perfiles por el admin usa service_role (bypassa RLS) desde las
--- funciones serverless /api/admin/*, por eso no hay policy de escritura aquí.
+-- ── RLS: perfil ─────────────────────────────────────────────────────────────
+-- El usuario lee su propio perfil; el admin lee/gestiona todos.
 drop policy if exists "own_profile_select" on public.profiles;
 create policy "own_profile_select" on public.profiles
   for select using (auth.uid() = id);
 
--- ── Privilegios de tabla ──────────────────────────────────────────────────
--- RLS decide QUÉ filas, pero el rol necesita el GRANT para tocar la tabla.
--- El usuario autenticado solo lee su perfil; lee/crea/actualiza su estado.
-grant select on public.profiles to authenticated;
+drop policy if exists "admin_select_all" on public.profiles;
+create policy "admin_select_all" on public.profiles
+  for select using (public.is_admin());
+
+drop policy if exists "admin_insert_all" on public.profiles;
+create policy "admin_insert_all" on public.profiles
+  for insert with check (public.is_admin());
+
+drop policy if exists "admin_update_all" on public.profiles;
+create policy "admin_update_all" on public.profiles
+  for update using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "admin_delete_all" on public.profiles;
+create policy "admin_delete_all" on public.profiles
+  for delete using (public.is_admin());
+
+-- ── Privilegios de tabla (RLS decide las filas; el rol necesita el GRANT) ────
+grant select, insert, update, delete on public.profiles to authenticated;
 grant select, insert, update on public.lifeos_state to authenticated;
 
--- service_role (funciones /api/admin/*) gestiona ambas tablas por completo.
-grant select, insert, update, delete on public.profiles to service_role;
-grant select, insert, update, delete on public.lifeos_state to service_role;
+-- ── Alta automática de perfil al crear un usuario en Auth ───────────────────
+-- Así, cuando el admin crea un usuario (desde la app o el dashboard de Supabase),
+-- su perfil aparece solo con valores por defecto (rol 'user', todas las vistas).
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, role, enabled_views, active)
+  values (
+    new.id,
+    coalesce(new.email, ''),
+    'user',
+    array['dashboard','kanban','timebox','calendar','roadmap'],
+    true
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
 
--- ── Bootstrap del primer admin ────────────────────────────────────────────
--- 1) Crea el usuario en Authentication → Users (o con la API).
--- 2) Inserta su perfil como admin (reemplaza el UUID y el email):
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- ── Bootstrap del primer admin ──────────────────────────────────────────────
+-- Crea el usuario en Authentication → Users (Auto Confirm) y luego márcalo admin:
 --
 -- insert into public.profiles (id, email, role)
--- values ('00000000-0000-0000-0000-000000000000', 'admin@tudominio.com', 'admin')
+-- select id, email, 'admin' from auth.users where email = 'admin@tudominio.com'
 -- on conflict (id) do update set role = 'admin', active = true;
