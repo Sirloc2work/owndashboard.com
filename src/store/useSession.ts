@@ -92,6 +92,11 @@ export const useSession = create<SessionState>()((set, get) => {
         return;
       }
       let applying = false;
+      // Red de seguridad: si en unos segundos seguimos en "loading" (evento que no
+      // llega o sesión que no resuelve), mostrar el login en vez de colgarse.
+      setTimeout(() => {
+        if (get().mode === 'loading') set({ mode: 'login' });
+      }, 6000);
       supabase.auth.onAuthStateChange((event, session) => {
         // No pisar el modo invitado con eventos de auth.
         if (get().mode === 'guest') return;
@@ -113,7 +118,15 @@ export const useSession = create<SessionState>()((set, get) => {
           // lock interno de gotrue (la sesión autentica pero nunca carga el perfil).
           setTimeout(() => {
             applySession(session)
-              .catch((e) => console.error('Error aplicando la sesión:', e))
+              .catch((e) => {
+                console.error('Error aplicando la sesión:', e);
+                // No dejar la app colgada en "loading": limpiar la sesión rota y
+                // volver al login para que el usuario pueda reintentar.
+                stopAutosave();
+                useStore.getState().hydrate(createEmptyData());
+                if (supabase) void supabase.auth.signOut();
+                set({ mode: 'login', session: null, profile: null });
+              })
               .finally(() => {
                 applying = false;
               });
