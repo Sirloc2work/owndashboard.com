@@ -58,6 +58,13 @@ interface LifeOSState extends LifeOSData {
   setScheduleWeekKey: (weekKey: string) => void;
   setScheduleEntry: (weekKey: string, day: string, hour: string, entry: ScheduleEntry) => void;
   clearScheduleEntry: (weekKey: string, day: string, hour: string) => void;
+  /** Rellena la misma actividad en varias semanas × días × franjas de una vez. */
+  addActivityBlock: (params: {
+    weekKeys: string[];
+    days: string[];
+    hours: string[];
+    entry: ScheduleEntry;
+  }) => void;
   copyWeek: (fromWeekKey: string, toWeekKey: string) => void;
   addHour: (hour: string) => void;
   removeHour: (hour: string) => void;
@@ -68,6 +75,8 @@ interface LifeOSState extends LifeOSData {
   ) => void;
 
   addImportantDate: (data: Omit<ImportantDate, 'id'>) => void;
+  /** Inserta varias fechas importantes de una vez (repetición de eventos). */
+  addImportantDates: (events: Omit<ImportantDate, 'id'>[]) => void;
   updateImportantDate: (id: string, updates: Partial<Omit<ImportantDate, 'id'>>) => void;
   deleteImportantDate: (id: string) => void;
 
@@ -189,6 +198,21 @@ export const useStore = create<LifeOSState>()((set) => ({
       return { weekSchedules: { ...state.weekSchedules, [weekKey]: week } };
     }),
 
+  addActivityBlock: ({ weekKeys, days, hours, entry }) =>
+    set((state) => {
+      const weekSchedules = { ...state.weekSchedules };
+      for (const wk of weekKeys) {
+        const week = { ...(weekSchedules[wk] ?? {}) };
+        for (const day of days) {
+          for (const hour of hours) {
+            week[`${day}|${hour}`] = { ...entry };
+          }
+        }
+        weekSchedules[wk] = week;
+      }
+      return { weekSchedules };
+    }),
+
   copyWeek: (fromWeekKey, toWeekKey) =>
     set((state) => {
       const src = state.weekSchedules[fromWeekKey];
@@ -218,6 +242,14 @@ export const useStore = create<LifeOSState>()((set) => ({
   addImportantDate: (data) =>
     set((state) => ({
       importantDates: [...state.importantDates, { ...data, id: crypto.randomUUID() }],
+    })),
+
+  addImportantDates: (events) =>
+    set((state) => ({
+      importantDates: [
+        ...state.importantDates,
+        ...events.map((e) => ({ ...e, id: crypto.randomUUID() })),
+      ],
     })),
 
   updateImportantDate: (id, updates) =>
