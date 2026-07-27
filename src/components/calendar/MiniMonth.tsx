@@ -1,6 +1,6 @@
 import { format, getDay, getDaysInMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { getPaletteEntry } from '@/lib/constants';
+import { getPaletteEntry, MULTI_DAY_CLASS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { ImportantDate } from '@/types';
 
@@ -40,7 +40,9 @@ export function MiniMonth({ year, month, eventsByDate, todayStr, onDayClick }: M
           const day = i + 1;
           const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           const events = eventsByDate.get(dateStr);
-          const palette = events?.length ? getPaletteEntry(events[0].category) : null;
+          const count = events?.length ?? 0;
+          const multi = count > 1;
+          const palette = count === 1 ? getPaletteEntry(events![0].category) : null;
           const isToday = dateStr === todayStr;
           return (
             <button
@@ -49,14 +51,21 @@ export function MiniMonth({ year, month, eventsByDate, todayStr, onDayClick }: M
               onClick={() => onDayClick(dateStr)}
               title={events?.map((e) => e.title).join(' · ')}
               className={cn(
-                'flex aspect-square items-center justify-center rounded-md text-xs tabular-nums transition-colors',
-                palette
-                  ? cn(palette.bgClass, palette.textClass, 'border font-semibold', palette.borderClass)
-                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                'relative flex aspect-square items-center justify-center rounded-md text-xs tabular-nums transition-colors',
+                multi
+                  ? MULTI_DAY_CLASS
+                  : palette
+                    ? cn(palette.bgClass, palette.textClass, 'border font-semibold', palette.borderClass)
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 isToday && 'ring-2 ring-primary'
               )}
             >
               {day}
+              {multi && (
+                <span className="absolute -top-1 -right-1 flex size-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground">
+                  {count}
+                </span>
+              )}
             </button>
           );
         })}

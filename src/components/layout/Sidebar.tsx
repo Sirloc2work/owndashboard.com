@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   LogOut,
   Map,
+  PanelLeftClose,
   ShieldCheck,
   Zap,
 } from 'lucide-react';
@@ -21,6 +22,10 @@ interface SidebarProps {
   isGuest: boolean;
   email: string;
   onSignOut: () => void;
+  /** Drawer visible u oculto. */
+  open: boolean;
+  /** Cerrar/ocultar el panel. */
+  onClose: () => void;
 }
 
 const NAV_ITEMS: { id: ViewId; label: string; icon: typeof LayoutDashboard }[] = [
@@ -39,19 +44,35 @@ export function Sidebar({
   isGuest,
   email,
   onSignOut,
+  open,
+  onClose,
 }: SidebarProps) {
   const items = NAV_ITEMS.filter((item) => enabledViews.includes(item.id));
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 flex w-56 flex-col border-r border-border bg-sidebar">
+    <aside
+      className={cn(
+        'fixed inset-y-0 left-0 z-40 flex w-56 flex-col border-r border-border bg-sidebar transition-transform duration-200',
+        open ? 'translate-x-0' : '-translate-x-full'
+      )}
+    >
       <div className="flex items-center gap-2 px-5 py-5">
         <Zap className="size-6 text-primary" />
         <span className="text-lg font-bold tracking-tight">LifeOS</span>
         {isGuest && (
-          <Badge variant="secondary" className="ml-auto text-[10px]">
+          <Badge variant="secondary" className="text-[10px]">
             Invitado
           </Badge>
         )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="ml-auto size-7 text-muted-foreground"
+          onClick={onClose}
+          title="Ocultar panel"
+        >
+          <PanelLeftClose className="size-4" />
+        </Button>
       </div>
 
       <nav className="flex flex-col gap-1 px-3">

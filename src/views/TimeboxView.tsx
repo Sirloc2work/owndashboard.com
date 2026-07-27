@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
+  CalendarPlus,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -29,6 +30,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { TimeBlockEditor } from '@/components/modals/TimeBlockEditor';
+import { ActivityDialog } from '@/components/modals/ActivityDialog';
 import { CopyWeekDialog } from '@/components/modals/CopyWeekDialog';
 import { DayDetailDialog } from '@/components/modals/DayDetailDialog';
 import { useStore } from '@/store/useStore';
@@ -56,6 +58,7 @@ export function TimeboxView() {
   const [editor, setEditor] = useState<{ day: string; hour: string; entry: ScheduleEntry | null }>();
   const [editorOpen, setEditorOpen] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const [dayDetail, setDayDetail] = useState<string | null>(null);
   const [dayDetailOpen, setDayDetailOpen] = useState(false);
   const [addHourOpen, setAddHourOpen] = useState(false);
@@ -180,6 +183,11 @@ export function TimeboxView() {
           <Button variant="outline" size="sm" onClick={() => setCopyOpen(true)}>
             <Copy className="size-4" />
             Copiar semana
+          </Button>
+
+          <Button size="sm" onClick={() => setActivityOpen(true)}>
+            <CalendarPlus className="size-4" />
+            Nueva actividad
           </Button>
         </div>
       </div>
@@ -317,6 +325,7 @@ export function TimeboxView() {
         hour={editor?.hour ?? null}
         entry={editor?.entry ?? null}
       />
+      <ActivityDialog open={activityOpen} onOpenChange={setActivityOpen} weekKey={weekKey} />
       <CopyWeekDialog open={copyOpen} onOpenChange={setCopyOpen} targetWeekKey={weekKey} />
       <DayDetailDialog open={dayDetailOpen} onOpenChange={setDayDetailOpen} date={dayDetail} />
     </div>

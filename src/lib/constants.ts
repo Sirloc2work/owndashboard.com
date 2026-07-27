@@ -117,6 +117,12 @@ export function getPaletteEntry(key: string): PaletteEntry {
   return COLOR_PALETTE.find((c) => c.key === key) ?? COLOR_PALETTE[5];
 }
 
+/**
+ * Estilo de un día con MÁS de un evento (varios). Distinto de los colores de la
+ * paleta para que se lea como "múltiple". Clases literales (Tailwind v4 estático).
+ */
+export const MULTI_DAY_CLASS = 'bg-primary/20 text-primary border border-primary/50 font-semibold';
+
 export const COLUMNS: Column[] = [
   { id: 'todo', title: 'Por Hacer' },
   { id: 'in-progress', title: 'En Progreso', wipLimit: 3 },

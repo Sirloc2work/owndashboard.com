@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { addMonths, addWeeks, addYears } from 'date-fns';
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -22,8 +23,11 @@ import {
 } from '@/components/ui/select';
 import { useStore } from '@/store/useStore';
 import { COLOR_PALETTE } from '@/lib/constants';
+import { parseLocalDate, toDateKey } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import type { ImportantDate } from '@/types';
+
+type Frequency = 'none' | 'weekly' | 'monthly' | 'yearly';
 
 interface ImportantDateEditorProps {
   open: boolean;
@@ -41,6 +45,7 @@ export function ImportantDateEditor({
   defaultDate,
 }: ImportantDateEditorProps) {
   const addImportantDate = useStore((s) => s.addImportantDate);
+  const addImportantDates = useStore((s) => s.addImportantDates);
   const updateImportantDate = useStore((s) => s.updateImportantDate);
   const deleteImportantDate = useStore((s) => s.deleteImportantDate);
 
@@ -48,6 +53,8 @@ export function ImportantDateEditor({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('red');
+  const [frequency, setFrequency] = useState<Frequency>('none');
+  const [repeatCount, setRepeatCount] = useState('4');
 
   useEffect(() => {
     if (open) {
@@ -55,6 +62,8 @@ export function ImportantDateEditor({
       setTitle(event?.title ?? '');
       setDescription(event?.description ?? '');
       setCategory(event?.category ?? 'red');
+      setFrequency('none');
+      setRepeatCount('4');
     }
   }, [open, event, defaultDate]);
 
@@ -71,6 +80,18 @@ export function ImportantDateEditor({
     if (event) {
       updateImportantDate(event.id, { date, title: trimmed, description, category });
       toast.success('Fecha importante actualizada');
+    } else if (frequency !== 'none') {
+      const count = Math.max(1, Math.min(60, Number(repeatCount) || 1));
+      const base = parseLocalDate(date);
+      const step = frequency === 'weekly' ? addWeeks : frequency === 'monthly' ? addMonths : addYears;
+      const events = Array.from({ length: count }, (_, k) => ({
+        date: k === 0 ? date : toDateKey(step(base, k)),
+        title: trimmed,
+        description,
+        category,
+      }));
+      addImportantDates(events);
+      toast.success(`${count} fechas creadas`);
     } else {
       addImportantDate({ date, title: trimmed, description, category });
       toast.success('Fecha importante creada');
@@ -147,6 +168,38 @@ export function ImportantDateEditor({
               </SelectContent>
             </Select>
           </div>
+
+          {!event && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Repetir</Label>
+                <Select value={frequency} onValueChange={(v) => setFrequency(v as Frequency)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No repetir</SelectItem>
+                    <SelectItem value="weekly">Semanal</SelectItem>
+                    <SelectItem value="monthly">Mensual</SelectItem>
+                    <SelectItem value="yearly">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {frequency !== 'none' && (
+                <div className="space-y-2">
+                  <Label htmlFor="idate-count">Nº de veces</Label>
+                  <Input
+                    id="idate-count"
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={repeatCount}
+                    onChange={(e) => setRepeatCount(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">

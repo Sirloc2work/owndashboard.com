@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, PanelLeft } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Dashboard } from '@/views/Dashboard';
 import { KanbanView } from '@/views/KanbanView';
@@ -9,7 +9,10 @@ import { RoadmapView } from '@/views/RoadmapView';
 import { AdminView } from '@/views/AdminView';
 import { LoginView } from '@/views/LoginView';
 import { Toaster } from '@/components/ui/sonner';
+import { Button } from '@/components/ui/button';
 import { useSession } from '@/store/useSession';
+import { VIEW_LABELS } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 import type { NavId, Profile, ViewId } from '@/types';
 
 export interface ViewProps {
@@ -68,33 +71,74 @@ function AppShell({
   const isAdmin = profile.role === 'admin';
   const enabledViews = profile.enabledViews;
   const [activeView, setActiveView] = useState<NavId>(enabledViews[0] ?? (isAdmin ? 'admin' : 'dashboard'));
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
+  );
 
   const isAdminView = activeView === 'admin';
   const canRenderView = !isAdminView && enabledViews.includes(activeView as ViewId);
   const ActiveView = canRenderView ? VIEWS[activeView as ViewId] : null;
+  const title = isAdminView ? 'Administración' : VIEW_LABELS[activeView as ViewId] ?? 'LifeOS';
+
+  const handleNavigate = (view: NavId) => {
+    setActiveView(view);
+    // En móvil, navegar cierra el drawer.
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+      setSidebarOpen(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Sidebar
         activeView={activeView}
-        onNavigate={setActiveView}
+        onNavigate={handleNavigate}
         enabledViews={enabledViews}
         isAdmin={isAdmin}
         isGuest={isGuest}
         email={profile.email}
         onSignOut={onSignOut}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
-      <main className="ml-56 h-screen overflow-y-auto p-6">
-        {isAdminView && isAdmin ? (
-          <AdminView />
-        ) : ActiveView ? (
-          <ActiveView onNavigate={setActiveView} />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            No tienes vistas habilitadas. Contacta al administrador.
-          </div>
+
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <div
+        className={cn(
+          'flex h-screen flex-col transition-[margin] duration-200',
+          sidebarOpen && 'md:ml-56'
         )}
-      </main>
+      >
+        <header className="flex shrink-0 items-center gap-2 border-b border-border bg-background/80 px-3 py-2 backdrop-blur">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen((o) => !o)}
+            title={sidebarOpen ? 'Ocultar panel' : 'Mostrar panel'}
+          >
+            <PanelLeft className="size-5" />
+          </Button>
+          <span className="text-sm font-semibold">{title}</span>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {isAdminView && isAdmin ? (
+            <AdminView />
+          ) : ActiveView ? (
+            <ActiveView onNavigate={setActiveView} />
+          ) : (
+            <div className="flex h-full items-center justify-center py-16 text-sm text-muted-foreground">
+              No tienes vistas habilitadas. Contacta al administrador.
+            </div>
+          )}
+        </main>
+      </div>
       <Toaster position="bottom-right" richColors />
     </div>
   );
