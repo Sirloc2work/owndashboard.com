@@ -10,6 +10,7 @@ import { AdminView } from '@/views/AdminView';
 import { LoginView } from '@/views/LoginView';
 import { Toaster } from '@/components/ui/sonner';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { useSession } from '@/store/useSession';
 import { VIEW_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -89,7 +90,7 @@ function AppShell({
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen text-foreground">
       <Sidebar
         activeView={activeView}
         onNavigate={handleNavigate}
@@ -115,7 +116,7 @@ function AppShell({
           sidebarOpen && 'md:ml-56'
         )}
       >
-        <header className="flex shrink-0 items-center gap-2 border-b border-border bg-background/80 px-3 py-2 backdrop-blur">
+        <header className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-3 py-2">
           <Button
             variant="ghost"
             size="icon"
@@ -125,6 +126,9 @@ function AppShell({
             <PanelLeft className="size-5" />
           </Button>
           <span className="text-sm font-semibold">{title}</span>
+          <div className="ml-auto">
+            <ThemeToggle />
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
