@@ -9,10 +9,25 @@ Es **multiusuario** con autenticación de Supabase (email/contraseña), datos
 efímeros, y un **panel de administración** para gestionar cuentas y su acceso a
 las vistas.
 
+La interfaz usa un estilo visual **"Liquid Glass"** (superficies translúcidas con
+desenfoque sobre un fondo *aurora*), con **tema claro y oscuro** y es **responsive**
+(en móvil el panel lateral se comporta como cajón).
+
+## Funciones destacadas
+
+- **Horario semanal**: edición por bloque y alta de **actividad por rango** (varios
+  días + rango de horas) con opción de **repetir en las próximas N semanas**.
+- **Calendario anual**: varias fechas por día (con indicador y contador cuando hay
+  más de una) y **repetición** de eventos (semanal/mensual/anual × N veces).
+- **Kanban** con límite WIP y arrastrar-soltar; **Roadmap** por fases; **Dashboard**
+  con el bloque actual, control WIP y próximas fechas.
+- **Apariencia**: botón para **cambiar tema** (claro/oscuro) y botón para
+  **ocultar/mostrar** el panel lateral.
+
 ## Stack
 
 React 19 · TypeScript · Vite · Tailwind v4 · shadcn/ui · Zustand · dnd-kit ·
-date-fns · **Supabase** (Auth + Postgres + RLS). Desplegado en Vercel.
+date-fns · next-themes · **Supabase** (Auth + Postgres + RLS). Desplegado en Vercel.
 
 ## Desarrollo local
 
@@ -89,6 +104,16 @@ Desde el login, **"Explorar como invitado"** carga una planificación de ejemplo
 (persona orientada a la productividad, con metas de corto/medio/largo plazo) que
 llena las cinco vistas. Todo ocurre en el navegador: **no se escribe en la base
 de datos** y los cambios se **descartan al salir o refrescar**.
+
+## Apariencia (Liquid Glass y temas)
+
+- **Tema claro/oscuro**: se alterna con el botón sol/luna de la barra superior
+  (gestionado con `next-themes`; por defecto oscuro).
+- **Liquid Glass**: fondo *aurora* de color fijo y superficies translúcidas con
+  `backdrop-filter`. Los tokens de color (oklch), el acento azul/violeta y las reglas
+  de vidrio viven en [src/index.css](src/index.css); la paleta de 9 colores de
+  etiquetas/categorías no cambia. El `backdrop-filter` es costoso, por eso el
+  desenfoque se aplica solo a superficies grandes (no por celda del horario).
 
 ## Arquitectura
 
