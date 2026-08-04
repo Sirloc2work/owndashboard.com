@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import type {
+  CompletionEvent,
+  DashboardWidget,
   ImportantDate,
   LifeOSData,
   Priority,
@@ -8,8 +10,44 @@ import type {
   Tag,
   Task,
 } from '@/types';
-import { HOURS, getPaletteEntry } from '@/lib/constants';
+import { DEFAULT_WIDGETS, HOURS, getPaletteEntry } from '@/lib/constants';
 import { getWeekKey } from '@/lib/date';
+
+const DONE_COLUMN_ID = 'done';
+
+/** Ajusta el historial de completadas cuando una tarea entra o sale de 'done'. */
+function completionsAfterMove(
+  completions: CompletionEvent[],
+  fromColumnId: string,
+  toColumnId: string,
+  t: Task
+): CompletionEvent[] {
+  const wasDone = fromColumnId === DONE_COLUMN_ID;
+  const willDone = toColumnId === DONE_COLUMN_ID;
+  if (!wasDone && willDone) {
+    return [
+      ...completions,
+      {
+        id: crypto.randomUUID(),
+        taskId: t.id,
+        completedAt: Date.now(),
+        urgency: t.urgency ?? 'media',
+        importance: t.importance ?? 'media',
+        tagIds: [...t.tagIds],
+        title: t.title,
+      },
+    ];
+  }
+  if (wasDone && !willDone) {
+    // Quitar el evento más reciente de esa tarea (deshacer el completado).
+    for (let i = completions.length - 1; i >= 0; i--) {
+      if (completions[i].taskId === t.id) {
+        return completions.filter((_, idx) => idx !== i);
+      }
+    }
+  }
+  return completions;
+}
 
 function makeTag(id: string, name: string, colorKey: string): Tag {
   const palette = getPaletteEntry(colorKey);
@@ -32,6 +70,8 @@ export function createEmptyData(): LifeOSData {
     weekSchedules: { [getWeekKey(new Date())]: {} },
     roadmapPhases: [],
     importantDates: [],
+    completions: [],
+    dashboardWidgets: [...DEFAULT_WIDGETS],
   };
 }
 
@@ -85,7 +125,10 @@ interface LifeOSState extends LifeOSData {
   updateImportantDate: (id: string, updates: Partial<Omit<ImportantDate, 'id'>>) => void;
   deleteImportantDate: (id: string) => void;
 
-  /** Reemplaza los 6 slices de datos (hidratación desde BD / demo / reset). */
+  /** Reemplaza el layout de widgets del dashboard (añadir/quitar/ordenar/tamaño). */
+  setDashboardWidgets: (list: DashboardWidget[]) => void;
+
+  /** Reemplaza los slices de datos (hidratación desde BD / demo / reset). */
   hydrate: (data: LifeOSData) => void;
 }
 
@@ -144,11 +187,22 @@ export const useStore = create<LifeOSState>()((set) => ({
     })),
 
   updateTask: (id, updates) =>
-    set((state) => ({
-      tasks: state.tasks.map((task) =>
-        task.id === id ? { ...task, ...updates, updatedAt: Date.now() } : task
-      ),
-    })),
+    set((state) => {
+      const task = state.tasks.find((t) => t.id === id);
+      if (!task) return state;
+      const columnChanged =
+        updates.columnId !== undefined && updates.columnId !== task.columnId;
+      const merged = { ...task, ...updates };
+      const completions = columnChanged
+        ? completionsAfterMove(state.completions, task.columnId, updates.columnId!, merged)
+        : state.completions;
+      return {
+        tasks: state.tasks.map((t) =>
+          t.id === id ? { ...merged, updatedAt: Date.now() } : t
+        ),
+        completions,
+      };
+    }),
 
   deleteTask: (id) =>
     set((state) => ({
@@ -186,7 +240,10 @@ export const useStore = create<LifeOSState>()((set) => ({
         insertIdx = lastOfColumn + 1;
       }
       tasks.splice(insertIdx, 0, moved);
-      return { tasks };
+      const completions = columnChanged
+        ? completionsAfterMove(state.completions, task.columnId, toColumnId, task)
+        : state.completions;
+      return { tasks, completions };
     }),
 
   setScheduleWeekKey: (weekKey) => set({ scheduleWeekKey: weekKey }),
@@ -271,6 +328,8 @@ export const useStore = create<LifeOSState>()((set) => ({
       importantDates: state.importantDates.filter((event) => event.id !== id),
     })),
 
+  setDashboardWidgets: (list) => set({ dashboardWidgets: list }),
+
   hydrate: (data) =>
     set({
       tags: data.tags,
@@ -279,6 +338,11 @@ export const useStore = create<LifeOSState>()((set) => ({
       weekSchedules: data.weekSchedules,
       roadmapPhases: data.roadmapPhases,
       importantDates: data.importantDates,
+      // Retrocompatible: datos antiguos sin estas slices toman valores por defecto.
+      completions: data.completions ?? [],
+      dashboardWidgets: data.dashboardWidgets?.length
+        ? data.dashboardWidgets
+        : [...DEFAULT_WIDGETS],
       scheduleWeekKey: getWeekKey(new Date()),
     }),
 }));
@@ -292,5 +356,7 @@ export function getLifeOSData(state: LifeOSState): LifeOSData {
     weekSchedules: state.weekSchedules,
     roadmapPhases: state.roadmapPhases,
     importantDates: state.importantDates,
+    completions: state.completions,
+    dashboardWidgets: state.dashboardWidgets,
   };
 }
