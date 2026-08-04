@@ -6,7 +6,6 @@ import {
   closestCorners,
   useSensor,
   useSensors,
-  type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
@@ -17,8 +16,17 @@ import { TaskCardContent } from '@/components/kanban/TaskCard';
 import { TaskEditor } from '@/components/modals/TaskEditor';
 import { TagManager } from '@/components/modals/TagManager';
 import { useStore } from '@/store/useStore';
-import { COLUMNS } from '@/lib/constants';
+import { COLUMNS, PRIORITY_RANK } from '@/lib/constants';
 import type { Task } from '@/types';
+
+/** Ordena una columna por urgencia y, a igual urgencia, por importancia. */
+function sortByPriority(list: Task[]): Task[] {
+  return [...list].sort(
+    (a, b) =>
+      PRIORITY_RANK[b.urgency ?? 'media'] - PRIORITY_RANK[a.urgency ?? 'media'] ||
+      PRIORITY_RANK[b.importance ?? 'media'] - PRIORITY_RANK[a.importance ?? 'media']
+  );
+}
 
 export function KanbanView() {
   const tasks = useStore((s) => s.tasks);
@@ -62,19 +70,11 @@ export function KanbanView() {
     moveTask(activeId, overColumnId, overTask ? overId : null);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  // El orden dentro de cada columna es automático (urgencia → importancia), así
+  // que el drop solo cierra el arrastre; los movimientos entre columnas ya los
+  // aplica onDragOver.
+  const handleDragEnd = () => {
     setActiveTask(null);
-    const { active, over } = event;
-    if (!over) return;
-    const activeId = String(active.id);
-    const overId = String(over.id);
-    if (activeId === overId) return;
-
-    const task = findTask(activeId);
-    const overTask = findTask(overId);
-    if (task && overTask && task.columnId === overTask.columnId) {
-      moveTask(activeId, task.columnId, overId);
-    }
   };
 
   const openCreate = (columnId: string) => {
@@ -116,7 +116,7 @@ export function KanbanView() {
             <KanbanColumn
               key={column.id}
               column={column}
-              tasks={tasks.filter((t) => t.columnId === column.id)}
+              tasks={sortByPriority(tasks.filter((t) => t.columnId === column.id))}
               onTaskClick={openEdit}
               onAddTask={() => openCreate(column.id)}
             />

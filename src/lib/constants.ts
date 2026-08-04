@@ -1,4 +1,4 @@
-import type { ColorKey, Column, ViewId } from '@/types';
+import type { ColorKey, Column, Priority, ViewId } from '@/types';
 
 /** Las 5 vistas de datos, en orden. Fuente de verdad de `enabled_views`. */
 export const BASE_VIEW_IDS: ViewId[] = [
@@ -150,3 +150,25 @@ export const HOURS = Array.from({ length: 16 }, (_, i) => {
 });
 
 export const BLOCKED_ALERT_MS = 48 * 60 * 60 * 1000;
+
+// ── Prioridad de tareas (urgencia / importancia) ────────────────────────────
+export interface PriorityMeta {
+  key: Priority;
+  label: string;
+  /** Clases literales completas (Tailwind v4 extrae estático). */
+  badgeClass: string;
+  dotClass: string;
+}
+
+export const PRIORITIES: PriorityMeta[] = [
+  { key: 'alta', label: 'Alta', badgeClass: 'bg-red-500/15 text-red-400 border-red-500/40', dotClass: 'bg-red-500' },
+  { key: 'media', label: 'Media', badgeClass: 'bg-amber-500/15 text-amber-400 border-amber-500/40', dotClass: 'bg-amber-500' },
+  { key: 'baja', label: 'Baja', badgeClass: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/40', dotClass: 'bg-zinc-500' },
+];
+
+/** Rango para ordenar (mayor = más prioritario). */
+export const PRIORITY_RANK: Record<Priority, number> = { alta: 3, media: 2, baja: 1 };
+
+export function getPriorityMeta(key: Priority | undefined): PriorityMeta {
+  return PRIORITIES.find((p) => p.key === key) ?? PRIORITIES[1];
+}

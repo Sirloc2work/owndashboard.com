@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type {
   ImportantDate,
   LifeOSData,
+  Priority,
   RoadmapPhase,
   ScheduleEntry,
   Tag,
@@ -47,10 +48,14 @@ interface LifeOSState extends LifeOSData {
     description?: string;
     columnId: string;
     tagIds: string[];
+    urgency?: Priority;
+    importance?: Priority;
   }) => void;
   updateTask: (
     id: string,
-    updates: Partial<Pick<Task, 'title' | 'description' | 'columnId' | 'tagIds'>>
+    updates: Partial<
+      Pick<Task, 'title' | 'description' | 'columnId' | 'tagIds' | 'urgency' | 'importance'>
+    >
   ) => void;
   deleteTask: (id: string) => void;
   moveTask: (taskId: string, toColumnId: string, overTaskId: string | null) => void;
@@ -131,6 +136,8 @@ export const useStore = create<LifeOSState>()((set) => ({
           description: data.description,
           columnId: data.columnId,
           tagIds: data.tagIds,
+          urgency: data.urgency ?? 'media',
+          importance: data.importance ?? 'media',
           updatedAt: Date.now(),
         },
       ],

@@ -7,12 +7,19 @@ export interface Tag {
   borderClass: string;
 }
 
+/** Nivel de urgencia/importancia de una tarea. */
+export type Priority = 'alta' | 'media' | 'baja';
+
 export interface Task {
   id: string;
   title: string;
   description?: string;
   columnId: string;
   tagIds: string[];
+  /** Nivel de urgencia (opcional en datos antiguos; se asume 'media'). */
+  urgency?: Priority;
+  /** Nivel de importancia (opcional en datos antiguos; se asume 'media'). */
+  importance?: Priority;
   updatedAt: number;
 }
 
