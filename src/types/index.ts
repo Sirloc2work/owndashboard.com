@@ -97,7 +97,40 @@ export interface Profile {
   createdAt: string;
 }
 
-/** Los 6 slices de datos que se sincronizan con la base de datos por usuario. */
+/** Evento de tarea completada (historial para el gráfico de progreso). */
+export interface CompletionEvent {
+  id: string;
+  taskId: string;
+  /** Momento en que la tarea pasó a 'done'. */
+  completedAt: number;
+  urgency: Priority;
+  importance: Priority;
+  tagIds: string[];
+  title: string;
+}
+
+/** Widgets disponibles en el dashboard configurable. */
+export type WidgetId =
+  | 'reloj'
+  | 'bloque-actual'
+  | 'bloque-siguiente'
+  | 'control-wip'
+  | 'foco-fase'
+  | 'enfoques-fase'
+  | 'proximas-fechas'
+  | 'progreso'
+  | 'resumen-kanban'
+  | 'tareas-urgentes';
+
+export type WidgetSize = 'sm' | 'wide';
+
+/** Un widget colocado en el dashboard (el orden lo da la posición en el array). */
+export interface DashboardWidget {
+  id: WidgetId;
+  size: WidgetSize;
+}
+
+/** Los slices de datos que se sincronizan con la base de datos por usuario. */
 export interface LifeOSData {
   tags: Tag[];
   tasks: Task[];
@@ -105,4 +138,8 @@ export interface LifeOSData {
   weekSchedules: WeekSchedules;
   roadmapPhases: RoadmapPhase[];
   importantDates: ImportantDate[];
+  /** Historial de tareas completadas (para el progreso). */
+  completions: CompletionEvent[];
+  /** Layout del dashboard configurable (orden + tamaño). */
+  dashboardWidgets: DashboardWidget[];
 }

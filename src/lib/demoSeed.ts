@@ -1,13 +1,15 @@
 import type {
+  CompletionEvent,
   ImportantDate,
   LifeOSData,
+  Priority,
   RoadmapPhase,
   ScheduleEntry,
   Tag,
   Task,
   WeekSchedules,
 } from '@/types';
-import { DAYS, HOURS, getPaletteEntry } from '@/lib/constants';
+import { DAYS, DEFAULT_WIDGETS, HOURS, getPaletteEntry } from '@/lib/constants';
 import { getWeekKey } from '@/lib/date';
 
 function makeTag(id: string, name: string, colorKey: string): Tag {
@@ -293,6 +295,44 @@ const demoRoadmap: RoadmapPhase[] = [
   },
 ];
 
+/** Historial de completadas de los últimos 30 días, con tendencia de mejora. */
+function buildDemoCompletions(now: number): CompletionEvent[] {
+  const DAY = 86400000;
+  const tagList = [
+    'tag-trabajo',
+    'tag-salud',
+    'tag-aprendizaje',
+    'tag-personal',
+    'tag-finanzas',
+    'tag-hogar',
+  ];
+  const levels: Priority[] = ['alta', 'media', 'baja'];
+  const events: CompletionEvent[] = [];
+  let seed = 7;
+  const rnd = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+  for (let d = 29; d >= 0; d--) {
+    const recency = (29 - d) / 29; // 0 = antiguo, 1 = reciente
+    const count = Math.round(0.4 + rnd() * 1.4 + recency * 2.2);
+    for (let k = 0; k < count; k++) {
+      const urgency = levels[Math.max(0, Math.floor(rnd() * 3 - recency * 0.9))];
+      const importance = levels[Math.floor(rnd() * 3)];
+      events.push({
+        id: `demo-comp-${d}-${k}`,
+        taskId: `demo-done-${d}-${k}`,
+        completedAt: now - d * DAY + Math.floor(rnd() * DAY * 0.6),
+        urgency,
+        importance,
+        tagIds: [tagList[Math.floor(rnd() * tagList.length)]],
+        title: 'Tarea completada',
+      });
+    }
+  }
+  return events;
+}
+
 /** Estado completo de LifeOS para el modo invitado (efímero, no persiste). */
 export function buildDemoData(): LifeOSData {
   const now = Date.now();
@@ -304,6 +344,8 @@ export function buildDemoData(): LifeOSData {
     weekSchedules,
     roadmapPhases: demoRoadmap,
     importantDates: demoImportantDates,
+    completions: buildDemoCompletions(now),
+    dashboardWidgets: [...DEFAULT_WIDGETS],
   };
 }
 
@@ -320,5 +362,7 @@ export function buildStarterData(): LifeOSData {
     weekSchedules: { [getWeekKey(new Date())]: {} },
     roadmapPhases: demoRoadmap,
     importantDates: [],
+    completions: [],
+    dashboardWidgets: [...DEFAULT_WIDGETS],
   };
 }

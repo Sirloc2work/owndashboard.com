@@ -1,4 +1,4 @@
-import type { ColorKey, Column, Priority, ViewId } from '@/types';
+import type { ColorKey, Column, DashboardWidget, Priority, ViewId, WidgetId } from '@/types';
 
 /** Las 5 vistas de datos, en orden. Fuente de verdad de `enabled_views`. */
 export const BASE_VIEW_IDS: ViewId[] = [
@@ -172,3 +172,28 @@ export const PRIORITY_RANK: Record<Priority, number> = { alta: 3, media: 2, baja
 export function getPriorityMeta(key: Priority | undefined): PriorityMeta {
   return PRIORITIES.find((p) => p.key === key) ?? PRIORITIES[1];
 }
+
+// ── Dashboard configurable (widgets) ────────────────────────────────────────
+export const WIDGET_LABELS: Record<WidgetId, string> = {
+  reloj: 'Reloj y fecha',
+  'bloque-actual': 'Bloque actual',
+  'bloque-siguiente': 'Bloque siguiente',
+  'control-wip': 'Control WIP',
+  'foco-fase': 'Foco de fase',
+  'enfoques-fase': 'Enfoques de la fase',
+  'proximas-fechas': 'Próximas fechas',
+  progreso: 'Progreso de tareas',
+  'resumen-kanban': 'Resumen Kanban',
+  'tareas-urgentes': 'Tareas urgentes',
+};
+
+/** Layout inicial del dashboard (nuevas cuentas, invitado y datos sin layout). */
+export const DEFAULT_WIDGETS: DashboardWidget[] = [
+  { id: 'reloj', size: 'sm' },
+  { id: 'bloque-actual', size: 'sm' },
+  { id: 'bloque-siguiente', size: 'sm' },
+  { id: 'progreso', size: 'wide' },
+  { id: 'control-wip', size: 'sm' },
+  { id: 'proximas-fechas', size: 'sm' },
+  { id: 'foco-fase', size: 'sm' },
+];
