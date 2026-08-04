@@ -1,10 +1,10 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Flame, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useStore } from '@/store/useStore';
-import { BLOCKED_ALERT_MS, BLOCKED_COLUMN_ID } from '@/lib/constants';
+import { BLOCKED_ALERT_MS, BLOCKED_COLUMN_ID, getPriorityMeta } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { Task } from '@/types';
 
@@ -19,6 +19,8 @@ export function TaskCardContent({ task, className }: { task: Task; className?: s
   const tags = useStore((s) => s.tags);
   const taskTags = tags.filter((tag) => task.tagIds.includes(tag.id));
   const stale = isStaleBlocked(task);
+  const urgency = getPriorityMeta(task.urgency);
+  const importance = getPriorityMeta(task.importance);
 
   return (
     <Card className={cn('cursor-grab gap-0 border-border/80 py-3 select-none', className)}>
@@ -35,6 +37,24 @@ export function TaskCardContent({ task, className }: { task: Task; className?: s
         {task.description && (
           <p className="line-clamp-2 text-xs text-muted-foreground">{task.description}</p>
         )}
+        <div className="flex flex-wrap items-center gap-1">
+          <Badge
+            variant="outline"
+            className={cn('gap-1 text-[10px]', urgency.badgeClass)}
+            title={`Urgencia: ${urgency.label}`}
+          >
+            <Flame className="size-2.5" />
+            {urgency.label}
+          </Badge>
+          <Badge
+            variant="outline"
+            className={cn('gap-1 text-[10px]', importance.badgeClass)}
+            title={`Importancia: ${importance.label}`}
+          >
+            <Star className="size-2.5" />
+            {importance.label}
+          </Badge>
+        </div>
         {taskTags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {taskTags.map((tag) => (

@@ -22,9 +22,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useStore } from '@/store/useStore';
-import { COLUMNS } from '@/lib/constants';
+import { COLUMNS, PRIORITIES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { Task } from '@/types';
+import type { Priority, Task } from '@/types';
 
 interface TaskEditorProps {
   open: boolean;
@@ -45,6 +45,8 @@ export function TaskEditor({ open, onOpenChange, task, defaultColumnId }: TaskEd
   const [description, setDescription] = useState('');
   const [columnId, setColumnId] = useState(defaultColumnId ?? 'todo');
   const [tagIds, setTagIds] = useState<string[]>([]);
+  const [urgency, setUrgency] = useState<Priority>('media');
+  const [importance, setImportance] = useState<Priority>('media');
 
   useEffect(() => {
     if (open) {
@@ -52,6 +54,8 @@ export function TaskEditor({ open, onOpenChange, task, defaultColumnId }: TaskEd
       setDescription(task?.description ?? '');
       setColumnId(task?.columnId ?? defaultColumnId ?? 'todo');
       setTagIds(task?.tagIds ?? []);
+      setUrgency(task?.urgency ?? 'media');
+      setImportance(task?.importance ?? 'media');
     }
   }, [open, task, defaultColumnId]);
 
@@ -68,10 +72,10 @@ export function TaskEditor({ open, onOpenChange, task, defaultColumnId }: TaskEd
       return;
     }
     if (task) {
-      updateTask(task.id, { title: trimmed, description, columnId, tagIds });
+      updateTask(task.id, { title: trimmed, description, columnId, tagIds, urgency, importance });
       toast.success('Tarea actualizada');
     } else {
-      addTask({ title: trimmed, description, columnId, tagIds });
+      addTask({ title: trimmed, description, columnId, tagIds, urgency, importance });
       toast.success('Tarea creada');
     }
     onOpenChange(false);
@@ -130,6 +134,45 @@ export function TaskEditor({ open, onOpenChange, task, defaultColumnId }: TaskEd
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Urgencia</Label>
+              <Select value={urgency} onValueChange={(v) => setUrgency(v as Priority)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITIES.map((p) => (
+                    <SelectItem key={p.key} value={p.key}>
+                      <span className="flex items-center gap-2">
+                        <span className={cn('size-2.5 rounded-full', p.dotClass)} />
+                        {p.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Importancia</Label>
+              <Select value={importance} onValueChange={(v) => setImportance(v as Priority)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITIES.map((p) => (
+                    <SelectItem key={p.key} value={p.key}>
+                      <span className="flex items-center gap-2">
+                        <span className={cn('size-2.5 rounded-full', p.dotClass)} />
+                        {p.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-2">

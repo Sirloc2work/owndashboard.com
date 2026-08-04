@@ -40,6 +40,8 @@ function buildDemoTasks(now: number): Task[] {
       description: 'Resultados del trimestre y objetivos del siguiente para la reunión de equipo.',
       columnId: 'todo',
       tagIds: ['tag-trabajo'],
+      urgency: 'alta',
+      importance: 'alta',
       updatedAt: now,
     },
     {
@@ -47,6 +49,8 @@ function buildDemoTasks(now: number): Task[] {
       title: 'Reservar chequeo médico anual',
       columnId: 'todo',
       tagIds: ['tag-salud'],
+      urgency: 'media',
+      importance: 'media',
       updatedAt: now,
     },
     {
@@ -55,6 +59,8 @@ function buildDemoTasks(now: number): Task[] {
       description: 'Comparar destinos, presupuesto y fechas de diciembre.',
       columnId: 'todo',
       tagIds: ['tag-personal'],
+      urgency: 'baja',
+      importance: 'media',
       updatedAt: now,
     },
     {
@@ -62,6 +68,8 @@ function buildDemoTasks(now: number): Task[] {
       title: 'Investigar plan de ahorro e inversión',
       columnId: 'todo',
       tagIds: ['tag-finanzas'],
+      urgency: 'baja',
+      importance: 'alta',
       updatedAt: now,
     },
     {
@@ -70,6 +78,8 @@ function buildDemoTasks(now: number): Task[] {
       description: 'Completar lecciones y práctica de speaking de la semana.',
       columnId: 'in-progress',
       tagIds: ['tag-aprendizaje'],
+      urgency: 'media',
+      importance: 'alta',
       updatedAt: now,
     },
     {
@@ -77,6 +87,8 @@ function buildDemoTasks(now: number): Task[] {
       title: 'Rutina de gimnasio 3x por semana',
       columnId: 'in-progress',
       tagIds: ['tag-salud'],
+      urgency: 'baja',
+      importance: 'alta',
       updatedAt: now,
     },
     {
@@ -85,6 +97,8 @@ function buildDemoTasks(now: number): Task[] {
       description: 'Construir la landing y un MVP funcional para validar la idea.',
       columnId: 'in-progress',
       tagIds: ['tag-personal', 'tag-aprendizaje'],
+      urgency: 'alta',
+      importance: 'alta',
       updatedAt: now,
     },
     {
@@ -93,6 +107,8 @@ function buildDemoTasks(now: number): Task[] {
       description: 'A la espera de la revisión legal antes de firmar.',
       columnId: 'blocked',
       tagIds: ['tag-trabajo'],
+      urgency: 'alta',
+      importance: 'alta',
       updatedAt: now - 72 * 60 * 60 * 1000,
     },
     {
@@ -100,6 +116,8 @@ function buildDemoTasks(now: number): Task[] {
       title: 'Declaración de impuestos',
       columnId: 'done',
       tagIds: ['tag-finanzas'],
+      urgency: 'media',
+      importance: 'media',
       updatedAt: now,
     },
     {
@@ -107,6 +125,8 @@ function buildDemoTasks(now: number): Task[] {
       title: 'Renovar pasaporte',
       columnId: 'done',
       tagIds: ['tag-personal'],
+      urgency: 'baja',
+      importance: 'baja',
       updatedAt: now,
     },
     {
@@ -114,6 +134,8 @@ function buildDemoTasks(now: number): Task[] {
       title: 'Meal prep semanal',
       columnId: 'done',
       tagIds: ['tag-hogar'],
+      urgency: 'baja',
+      importance: 'baja',
       updatedAt: now,
     },
   ];

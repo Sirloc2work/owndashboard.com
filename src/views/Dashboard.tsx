@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Activity, CalendarClock, CalendarDays, Settings2, Target } from 'lucide-react';
+import { Activity, CalendarClock, CalendarDays, Clock, Settings2, Target } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -23,7 +23,7 @@ import {
 } from '@/lib/constants';
 import { getActiveHour, getWeekKey, parseLocalDate } from '@/lib/date';
 import { cn } from '@/lib/utils';
-import type { ViewId } from '@/types';
+import type { ScheduleEntry, ViewId } from '@/types';
 
 function useNow(): Date {
   const [now, setNow] = useState(() => new Date());
@@ -55,6 +55,23 @@ export function Dashboard({ onNavigate }: { onNavigate: (view: ViewId) => void }
     ? weekSchedules[currentWeekKey]?.[`${currentDay}|${currentHour}`] ?? null
     : null;
   const blockPalette = currentBlock ? getPaletteEntry(currentBlock.category) : null;
+
+  // Próxima franja con actividad después de este momento (salta las "Libre").
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const toMinutes = (h: string) => {
+    const [hh, mm] = h.split(':').map(Number);
+    return hh * 60 + mm;
+  };
+  let nextBlock: { hour: string; entry: ScheduleEntry } | null = null;
+  for (const h of [...hours].sort()) {
+    if (toMinutes(h) <= nowMinutes) continue;
+    const entry = weekSchedules[currentWeekKey]?.[`${currentDay}|${h}`];
+    if (entry) {
+      nextBlock = { hour: h, entry };
+      break;
+    }
+  }
+  const nextPalette = nextBlock ? getPaletteEntry(nextBlock.entry.category) : null;
 
   const goToScheduleWeek = (date: string) => {
     setScheduleWeekKey(getWeekKey(parseLocalDate(date)));
@@ -94,56 +111,79 @@ export function Dashboard({ onNavigate }: { onNavigate: (view: ViewId) => void }
         </Button>
       </div>
 
-      {/* Banner de tiempo */}
-      <Card className="border-primary/20 bg-gradient-to-r from-card to-primary/5">
-        <CardContent className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
-          <div>
-            <p className="text-4xl font-bold tabular-nums tracking-tight">
-              {format(now, 'HH:mm:ss')}
-            </p>
-            <p className="text-sm text-muted-foreground first-letter:uppercase">
-              {format(now, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
-            </p>
-          </div>
-          <CalendarClock className="hidden size-10 text-muted-foreground/40 sm:block" />
-        </CardContent>
-      </Card>
+      {/* Fila superior: reloj compacto + bloque actual + bloque siguiente */}
+      <div className="flex flex-col gap-4 lg:flex-row">
+        {/* Reloj / fecha compacto */}
+        <Card className="lg:w-56 lg:shrink-0">
+          <CardContent className="flex items-center gap-3">
+            <Clock className="size-8 shrink-0 text-primary/70" />
+            <div>
+              <p className="text-2xl font-bold tabular-nums tracking-tight">
+                {format(now, 'HH:mm:ss')}
+              </p>
+              <p className="text-xs text-muted-foreground first-letter:uppercase">
+                {format(now, "EEEE d 'de' MMMM", { locale: es })}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
         {/* Bloque actual */}
-        <Card className={cn('border', blockPalette?.borderClass)}>
+        <Card className={cn('flex-1 border', blockPalette?.borderClass)}>
           <CardHeader>
             <CardDescription className="flex items-center gap-1.5">
               <CalendarClock className="size-3.5" />
-              Bloque Actual · {currentDay}
+              Ahora · {currentDay}
               {currentHour ? ` ${currentHour}` : ''}
             </CardDescription>
-            <CardTitle className="text-xl">
+            <CardTitle className="text-lg">
               {currentBlock ? currentBlock.activity : 'Fuera de horario — Descanso'}
             </CardTitle>
           </CardHeader>
           {blockPalette && currentBlock && (
-            <CardContent className="space-y-1.5">
+            <CardContent className="flex flex-wrap items-center gap-2">
               <Badge
                 variant="outline"
-                className={cn(
-                  blockPalette.bgClass,
-                  blockPalette.textClass,
-                  blockPalette.borderClass
-                )}
+                className={cn(blockPalette.bgClass, blockPalette.textClass, blockPalette.borderClass)}
               >
                 {blockPalette.label}
               </Badge>
               {currentBlock.place && (
-                <p className="text-xs text-muted-foreground">📍 {currentBlock.place}</p>
-              )}
-              {currentBlock.description && (
-                <p className="text-xs text-muted-foreground">{currentBlock.description}</p>
+                <span className="text-xs text-muted-foreground">📍 {currentBlock.place}</span>
               )}
             </CardContent>
           )}
         </Card>
 
+        {/* Bloque siguiente */}
+        <Card className={cn('flex-1 border', nextPalette?.borderClass)}>
+          <CardHeader>
+            <CardDescription className="flex items-center gap-1.5">
+              <CalendarClock className="size-3.5" />
+              Siguiente{nextBlock ? ` · empieza ${nextBlock.hour}` : ''}
+            </CardDescription>
+            <CardTitle className="text-lg">
+              {nextBlock ? nextBlock.entry.activity : 'Sin más bloques hoy'}
+            </CardTitle>
+          </CardHeader>
+          {nextPalette && nextBlock && (
+            <CardContent className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant="outline"
+                className={cn(nextPalette.bgClass, nextPalette.textClass, nextPalette.borderClass)}
+              >
+                {nextPalette.label}
+              </Badge>
+              {nextBlock.entry.place && (
+                <span className="text-xs text-muted-foreground">📍 {nextBlock.entry.place}</span>
+              )}
+            </CardContent>
+          )}
+        </Card>
+      </div>
+
+      {/* Fila: control WIP + foco de fase */}
+      <div className="grid gap-4 md:grid-cols-2">
         {/* Control WIP */}
         <Card className={cn(wipExceeded && 'border-red-500 shadow-[0_0_14px_rgba(239,68,68,0.3)]')}>
           <CardHeader>
